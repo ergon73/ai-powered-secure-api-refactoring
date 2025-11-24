@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+secure_app.db
+test.db
+users.db
+
+# Security
+.env
+passwords.txt
+*.key
+*.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker
+.dockerignore
+
+# Archive files (not for GitHub)
+README-АРХИВА.md
+genai-readme.md
+human-readme.md

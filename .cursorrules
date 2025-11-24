@@ -1,0 +1,497 @@
+# Cursor Rules: Flask Security Refactoring Project
+
+## 🎯 Project Context
+This is a security-focused refactoring project. Every code change must prioritize security, type safety, and maintainability. You are acting as a Senior Python Developer and Security Architect.
+
+---
+
+## 🔒 SECURITY RULES (HIGHEST PRIORITY)
+
+### Rule 1: SQL Injection Prevention
+**NEVER use string formatting or concatenation in SQL queries.**
+
+❌ **FORBIDDEN:**
+```python
+query = f"SELECT * FROM users WHERE id={user_id}"
+query = "SELECT * FROM users WHERE name='%s'" % name
+query = "INSERT INTO users VALUES('" + name + "')"
+```
+
+✅ **REQUIRED:**
+```python
+cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
+cursor.execute("SELECT * FROM users WHERE name=?", (name,))
+cursor.execute("INSERT INTO users(name) VALUES(?)", (name,))
+```
+
+**Exception:** NONE. This rule has no exceptions.
+
+---
+
+### Rule 2: Password Security
+**NEVER store passwords in plain text or use reversible "encryption".**
+
+❌ **FORBIDDEN:**
+```python
+password[::-1]  # String reversal is NOT hashing
+base64.encode(password)  # Encoding is NOT hashing
+password.upper()  # Any trivial transformation
+```
+
+✅ **REQUIRED:**
+```python
+from werkzeug.security import generate_password_hash, check_password_hash
+
+hashed = generate_password_hash(password, method='pbkdf2:sha256', salt_length=16)
+is_valid = check_password_hash(hashed, password)
+```
+
+**Minimum:** PBKDF2 with SHA-256 and salt. Prefer Argon2 or bcrypt for new projects.
+
+---
+
+### Rule 3: Resource Management
+**ALWAYS close database connections, files, and other resources.**
+
+❌ **FORBIDDEN:**
+```python
+conn = sqlite3.connect('db.sqlite')
+conn.execute(query)
+# Connection never closed
+```
+
+✅ **REQUIRED:**
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect('db.sqlite')
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+# Usage
+with get_db() as conn:
+    conn.execute(query)
+```
+
+---
+
+### Rule 4: Thread Safety
+**ALWAYS protect shared mutable state with locks.**
+
+❌ **FORBIDDEN:**
+```python
+active_users = []  # Global mutable state
+
+def add_active(user_id):
+    active_users.append(user_id)  # Race condition!
+```
+
+✅ **REQUIRED:**
+```python
+import threading
+
+active_users = []
+active_users_lock = threading.Lock()
+
+def add_active(user_id):
+    with active_users_lock:
+        active_users.append(user_id)
+```
+
+---
+
+## 📝 CODE QUALITY RULES
+
+### Rule 5: Type Hints (PEP 484)
+**ALL functions must have complete type hints.**
+
+❌ **FORBIDDEN:**
+```python
+def add_user(name):
+    return user_id
+```
+
+✅ **REQUIRED:**
+```python
+from typing import Optional
+
+def add_user(name: str) -> int:
+    """Add user and return ID."""
+    return user_id
+
+def get_user(user_id: int) -> Optional[dict]:
+    """Get user or None if not found."""
+    return user_data
+```
+
+**Required imports:**
+```python
+from typing import Optional, List, Dict, Any, Tuple, Union
+```
+
+---
+
+### Rule 6: PEP 8 Compliance
+**Follow Python style guide strictly.**
+
+**Naming conventions:**
+- Functions/variables: `snake_case`
+- Classes: `PascalCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Private: `_leading_underscore`
+
+**Formatting:**
+- Line length: max 100 characters (not 79 for modern screens)
+- Indentation: 4 spaces (never tabs)
+- Blank lines: 2 between top-level functions/classes, 1 between methods
+- Imports: standard library → third-party → local (with blank lines)
+
+**Example:**
+```python
+import os
+import sys
+
+from flask import Flask, request
+
+from app.database import get_db
+from app.security import hash_password
+
+MAX_USERS = 1000  # Constant
+```
+
+---
+
+### Rule 7: Docstrings
+**ALL public functions/classes must have docstrings.**
+
+**Format:** Google Style (preferred) or NumPy Style
+
+```python
+def create_user(name: str, email: str) -> int:
+    """
+    Create a new user in the database.
+    
+    Args:
+        name: Full name of the user
+        email: Valid email address
+        
+    Returns:
+        User ID of the created user
+        
+    Raises:
+        ValueError: If email format is invalid
+        DatabaseError: If insertion fails
+    """
+    pass
+```
+
+---
+
+### Rule 8: No Mutable Default Arguments
+**NEVER use mutable types as default arguments.**
+
+❌ **FORBIDDEN:**
+```python
+def add_tags(user_id, tags=[]):  # BUG!
+    tags.append("new")
+    return tags
+```
+
+✅ **REQUIRED:**
+```python
+def add_tags(user_id: int, tags: Optional[List[str]] = None) -> List[str]:
+    if tags is None:
+        tags = []
+    tags.append("new")
+    return tags
+```
+
+---
+
+## 🏗️ ARCHITECTURE RULES
+
+### Rule 9: Separation of Concerns
+**Organize code into logical modules.**
+
+**Required structure:**
+```
+app/
+├── __init__.py       # Flask app factory
+├── database.py       # DB connections, schema
+├── models.py         # Data models (optional)
+├── routes.py         # API endpoints only
+├── services.py       # Business logic
+└── security.py       # Auth, hashing, validation
+```
+
+**Rules:**
+- Routes should ONLY handle HTTP (request/response)
+- Business logic goes in services
+- Database code goes in database module
+- NO business logic in routes
+- NO database queries in routes
+
+---
+
+### Rule 10: Flask Best Practices
+
+**Use Application Factory pattern:**
+```python
+# app/__init__.py
+def create_app():
+    app = Flask(__name__)
+    
+    from app.database import init_db
+    init_db()
+    
+    from app.routes import api_bp
+    app.register_blueprint(api_bp)
+    
+    return app
+```
+
+**Use Blueprints for routes:**
+```python
+# app/routes.py
+from flask import Blueprint
+
+api_bp = Blueprint('api', __name__)
+
+@api_bp.route('/users', methods=['POST'])
+def create_user():
+    pass
+```
+
+---
+
+### Rule 11: HTTP Status Codes
+**Use semantically correct status codes.**
+
+| Code | When to Use |
+|------|-------------|
+| 200 | Successful GET/PUT/DELETE |
+| 201 | Successful POST (resource created) |
+| 204 | Successful DELETE (no content) |
+| 400 | Bad request (validation error) |
+| 404 | Resource not found |
+| 500 | Server error |
+
+❌ **WRONG:**
+```python
+@app.route('/users/<id>')
+def get_user(id):
+    user = find_user(id)
+    if not user:
+        return jsonify({"error": "not found"})  # Missing status!
+    return jsonify(user), 201  # Wrong! Should be 200
+```
+
+✅ **CORRECT:**
+```python
+@api_bp.route('/users/<int:user_id>')
+def get_user(user_id: int):
+    user = find_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(user), 200
+```
+
+---
+
+## 🐳 DOCKER RULES
+
+### Rule 12: Dockerfile Best Practices
+
+**Required elements:**
+```dockerfile
+# 1. Use slim official images
+FROM python:3.11-slim
+
+# 2. Set working directory
+WORKDIR /app
+
+# 3. Create non-root user
+RUN useradd -m -u 1000 appuser
+
+# 4. Copy requirements first (caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. Copy code
+COPY --chown=appuser:appuser . .
+
+# 6. Switch to non-root
+USER appuser
+
+# 7. Expose port
+EXPOSE 8000
+
+# 8. Use production server
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "main:app"]
+```
+
+**Forbidden:**
+- ❌ Using `python:latest` or `python:3` (too large)
+- ❌ Running as root user
+- ❌ Using Flask dev server in production
+- ❌ Hardcoding secrets in Dockerfile
+
+---
+
+## 📦 DEPENDENCY MANAGEMENT
+
+### Rule 13: requirements.txt
+**Pin major versions, allow minor updates.**
+
+✅ **CORRECT:**
+```txt
+Flask==3.0.0
+Werkzeug==3.0.1
+gunicorn==21.2.0
+```
+
+❌ **WRONG:**
+```txt
+Flask  # No version
+Flask>=2.0  # Too loose
+Flask==3.0.0.1  # Too specific
+```
+
+---
+
+## 🧪 ERROR HANDLING
+
+### Rule 14: Proper Exception Handling
+
+**ALWAYS catch specific exceptions:**
+
+❌ **WRONG:**
+```python
+try:
+    user = get_user(id)
+except:  # Too broad!
+    pass
+```
+
+✅ **CORRECT:**
+```python
+try:
+    user = get_user(user_id)
+except sqlite3.OperationalError as e:
+    logger.error(f"Database error: {e}")
+    return jsonify({"error": "Database unavailable"}), 500
+except ValueError as e:
+    return jsonify({"error": str(e)}), 400
+```
+
+---
+
+## 📚 DOCUMENTATION RULES
+
+### Rule 15: README Requirements
+
+**Must include:**
+1. Project description
+2. Security improvements (before/after)
+3. Architecture overview
+4. Installation instructions (local + Docker)
+5. API endpoints
+6. Testing examples
+7. Tech stack
+
+---
+
+## 🚫 FORBIDDEN PATTERNS
+
+**NEVER do this:**
+```python
+# Global database connection
+conn = sqlite3.connect('db.sqlite')
+
+# Mutable default arguments
+def func(items=[]):
+
+# Bare except
+try:
+    code()
+except:
+    pass
+
+# String SQL queries
+query = f"SELECT * FROM users WHERE id={id}"
+
+# Plain text passwords
+password = "secret123"
+
+# Missing type hints
+def add_user(name):
+
+# Debug mode in production
+app.run(debug=True)
+```
+
+---
+
+## ✅ QUALITY CHECKLIST
+
+Before accepting any code change:
+
+- [ ] No SQL injection vulnerabilities
+- [ ] Passwords properly hashed
+- [ ] Resources properly closed (context managers)
+- [ ] Thread-safe for shared state
+- [ ] Complete type hints on all functions
+- [ ] PEP 8 compliant
+- [ ] Docstrings on public functions
+- [ ] Correct HTTP status codes
+- [ ] No mutable default arguments
+- [ ] Proper exception handling
+- [ ] Modular architecture (separation of concerns)
+- [ ] Production-ready Docker configuration
+
+---
+
+## 🎯 WHEN IN DOUBT
+
+1. **Security first** — if unsure, choose the more secure option
+2. **Explicit over implicit** — clarity beats cleverness
+3. **Fail fast** — validate early, return errors clearly
+4. **Document why** — explain non-obvious decisions
+5. **Test thoroughly** — if you can't test it, refactor it
+
+---
+
+## 📞 COMMUNICATION STYLE
+
+When presenting changes:
+1. **Explain what** you're changing
+2. **Explain why** (the problem being solved)
+3. **Show diff** clearly
+4. **Highlight** security improvements
+5. **Ask for confirmation** before applying
+
+Example:
+```
+I'm fixing a SQL injection vulnerability in get_user().
+
+Problem: String concatenation in SQL allows injection attacks.
+Solution: Use parameterized queries with ? placeholders.
+
+Diff:
+- cursor.execute(f"SELECT * FROM users WHERE id={user_id}")
++ cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
+
+This change eliminates the injection risk. Apply? (yes/no)
+```
+
+---
+
+**Remember:** Quality code is secure, typed, tested, and maintainable. When refactoring legacy code, our goal is not just to make it work, but to make it right.
