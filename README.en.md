@@ -36,18 +36,46 @@ Production-ready Flask API demonstrating security best practices and modern Pyth
 
 ## 🏗️ Architecture
 
+### Project Versions
+
+The project contains two versions:
+
+1. **`app/`** — Basic refactored version
+   - All critical security vulnerabilities fixed
+   - Modular architecture
+   - Basic error handling
+
+2. **`app_latest/`** — Improved version with audit fixes ⭐ **Recommended**
+   - All fixes from basic version
+   - Enhanced error handling with logging
+   - Configuration via environment variables
+   - Full input validation
+   - Fixed `init_db` issue with Gunicorn
+   - Updated OpenAPI with all error descriptions
+   - See `app_latest/README.md` for details
+
 ```
 Modular Flask Application
-├── app/               # Application package
+├── app/               # Basic version
 │   ├── __init__.py    # Flask app factory
 │   ├── database.py    # DB connection management
 │   ├── routes.py      # API endpoints (blueprints)
 │   ├── services.py    # Business logic layer
 │   └── security.py    # Password hashing & validation
-├── main.py            # Application entry point
+├── app_latest/        # Improved version ⭐
+│   ├── __init__.py    # Flask factory with env config
+│   ├── config.py      # Configuration management
+│   ├── database.py    # DB with logging
+│   ├── routes.py      # Endpoints with full validation
+│   ├── services.py    # Business logic with error handling
+│   ├── security.py    # Password hashing
+│   └── README.md      # Improvements documentation
+├── main.py            # Entry point (basic version)
+├── main-latest.py     # Entry point (improved version) ⭐
 ├── requirements.txt   # Python dependencies
 ├── Dockerfile         # Container configuration
-├── openapi.yaml       # API documentation
+├── openapi.yaml       # API documentation (basic)
+├── openapi-latest.yaml # API documentation (improved) ⭐
 └── README.md          # Project documentation
 ```
 
@@ -63,6 +91,8 @@ Modular Flask Application
 
 ### Local Development
 
+#### Basic Version (`app/`)
+
 ```bash
 # Create virtual environment
 python -m venv venv
@@ -73,6 +103,26 @@ pip install -r requirements.txt
 
 # Run application
 python main.py
+```
+
+#### Improved Version (`app_latest/`) ⭐ **Recommended**
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run improved version
+python main-latest.py
+
+# Or with environment variables
+export DATABASE_PATH=my_app.db
+export MAX_NAME_LENGTH=100
+export LOG_LEVEL=DEBUG
+python main-latest.py
 ```
 
 The API will be available at `http://localhost:8000`
@@ -98,7 +148,9 @@ curl http://localhost:8000/health
 | GET | `/users/{id}` | Get user by ID | 200, 404 |
 | GET | `/health` | Health check | 200 |
 
-Full API documentation: `openapi.yaml`
+Full API documentation:
+- Basic version: `openapi.yaml`
+- Improved version: `openapi-latest.yaml` ⭐
 
 ### Example Requests
 
@@ -143,7 +195,7 @@ curl http://localhost:8000/users/999
 
 ### Using Postman/Insomnia
 
-Import `openapi.yaml` file to get all endpoints pre-configured.
+Import `openapi.yaml` (basic version) or `openapi-latest.yaml` (improved version) file to get all endpoints pre-configured.
 
 ## 📦 Tech Stack
 
@@ -215,12 +267,30 @@ Portfolio Project - Security Refactoring Demonstration
 
 ---
 
+## 📊 Version Comparison
+
+| Feature | `app/` | `app_latest/` ⭐ |
+|---------|--------|-----------------|
+| Security (SQL injection, passwords) | ✅ | ✅ |
+| Modular architecture | ✅ | ✅ |
+| Error handling | Basic | Enhanced with logging |
+| Configuration | Hardcoded | Via environment variables |
+| Input validation | Minimal | Full (type, length, characters) |
+| Logging | None | Configurable |
+| init_db in Gunicorn | Issue | Fixed |
+| OpenAPI specification | Basic | Complete with error descriptions |
+| Health check | Simple | With DB check |
+
+**Recommendation:** Use `app_latest/` for new projects and production.
+
+---
+
 **Note:** This is a demonstration project. For production use, consider:
 - Using PostgreSQL or MySQL instead of SQLite
 - Adding authentication and authorization
 - Implementing rate limiting
 - Adding comprehensive test suite
 - Setting up CI/CD pipeline
-- Using environment variables for configuration
-- Adding logging and monitoring
+- Using environment variables for configuration (implemented in `app_latest/`)
+- Adding logging and monitoring (implemented in `app_latest/`)
 
