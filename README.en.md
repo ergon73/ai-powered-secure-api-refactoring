@@ -208,6 +208,9 @@ MIT License - see LICENSE file
 
 ## 👤 Author
 
+**Georgy Belyanin (Георгий Белянин)**  
+📧 georgy.belyanin@gmail.com
+
 Portfolio Project - Security Refactoring Demonstration
 
 ---
